@@ -117,7 +117,7 @@ app.get('/api/issues/:id', async (req, res) => {
 // POST create issue
 app.post('/api/issues', async (req, res) => {
   try {
-    const { issue, category, latitude, longitude, imageData, imageName } =
+    const { issue, category, latitude, longitude, constituency, state, imageData, imageName } =
       req.body;
 
     // Validation
@@ -128,6 +128,8 @@ app.post('/api/issues', async (req, res) => {
       });
     }
 
+    console.log(`📝 Creating issue: "${issue}" in ${constituency || 'Unknown'}`);
+
     const issueId =
       Date.now().toString(36) + Math.random().toString(36).substr(2);
     const newIssue = {
@@ -136,13 +138,17 @@ app.post('/api/issues', async (req, res) => {
       category: category,
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
+      constituency: constituency || null,
+      state: state || null,
       status: 'open',
       imageData: imageData || null,
       imageName: imageName || 'image',
       createdAt: new Date().toISOString()
     };
 
+    console.log(`✅ Issue object ready: ${JSON.stringify(newIssue).substring(0, 100)}...`);
     const saved = await db.addIssue(newIssue);
+    console.log(`✅ Issue saved with ID: ${saved.id}`);
 
     res.status(201).json({
       success: true,
@@ -271,6 +277,35 @@ app.get('/api/search', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error searching',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================
+// Constituency Endpoints
+// ============================================================
+
+app.get('/api/constituencies/:name/issues', async (req, res) => {
+  try {
+    const constituencyName = decodeURIComponent(req.params.name);
+    const issues = await db.getAllIssues();
+
+    // Filter issues by constituency
+    const filteredIssues = issues.filter(issue =>
+      issue.constituency === constituencyName
+    );
+
+    res.json({
+      success: true,
+      data: filteredIssues,
+      count: filteredIssues.length
+    });
+  } catch (error) {
+    console.error('Error fetching constituency issues:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching constituency issues',
       error: error.message
     });
   }

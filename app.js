@@ -4,10 +4,12 @@
 
 class IssueReportingApp {
   constructor() {
+    console.log('👷 IssueReportingApp constructor called');
     this.issues = [];
     this.filteredIssues = [];
     this.currentImageFile = null;
     this.apiBaseUrl = 'http://localhost:3000/api';
+    this.listenersSetup = false; // Prevent duplicate listeners
     this.categories = [
       'Road Damage',
       'Pothole',
@@ -27,16 +29,30 @@ class IssueReportingApp {
   // ============================================================
 
   init() {
+    console.log('📍 IssueReportingApp.init() called, listenersSetup =', this.listenersSetup);
     this.loadIssuesFromAPI();
     this.setupEventListeners();
     this.populateCategoryFilter();
   }
 
   setupEventListeners() {
-    // Form submission
+    console.log('🔧 Parent setupEventListeners() called, listenersSetup =', this.listenersSetup);
+    // Only setup listeners once
+    if (this.listenersSetup) {
+      console.log('⚠️ Listeners already setup, skipping');
+      return;
+    }
+
+    this.listenersSetup = true;
+    console.log('✅ Setting listenersSetup = true, adding listeners');
+
+    // Form submission - only add listener once
     const issueForm = document.getElementById('issueForm');
     if (issueForm) {
-      issueForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
+      issueForm.addEventListener('submit', (e) => {
+        console.log('📝 Form submit event triggered');
+        this.handleFormSubmit(e);
+      });
     }
 
     // Image upload
@@ -44,37 +60,57 @@ class IssueReportingApp {
     const imageInput = document.getElementById('imageInput');
 
     if (uploadArea && imageInput) {
-      uploadArea.addEventListener('click', () => imageInput.click());
-      imageInput.addEventListener('change', (e) => this.handleImageSelect(e));
+      // Click handler - open file picker
+      uploadArea.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('🖱️ Upload area clicked, opening file picker');
+        imageInput.click();
+      });
+
+      // Change handler - process selected file
+      imageInput.addEventListener('change', (e) => {
+        console.log('📂 File selected, processing');
+        this.handleImageSelect(e);
+      });
     }
 
     // Drag and drop
     if (uploadArea && imageInput) {
       uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         uploadArea.style.background = '#f0f2ff';
       });
 
-      uploadArea.addEventListener('dragleave', () => {
+      uploadArea.addEventListener('dragleave', (e) => {
+        e.stopPropagation();
         uploadArea.style.background = '#f8f9ff';
       });
 
       uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         uploadArea.style.background = '#f8f9ff';
         if (e.dataTransfer.files.length > 0) {
-          imageInput.files = e.dataTransfer.files;
+          console.log('📥 File dropped, processing');
+          // Only call handleImageSelect directly, don't set imageInput.files
+          // to avoid triggering the change event
           this.handleImageSelect({ target: { files: e.dataTransfer.files } });
         }
       });
     }
 
-    // Geolocation
+    // Geolocation - only add listener once
     const getCurrentLocationBtn = document.getElementById('getCurrentLocation');
     if (getCurrentLocationBtn) {
-      getCurrentLocationBtn.addEventListener('click', () =>
-        this.getCurrentLocation()
-      );
+      console.log('📍 Adding listener to getCurrentLocation button');
+      getCurrentLocationBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎯 Get current location CLICKED');
+        this.getCurrentLocation();
+      });
+      console.log('✅ Geolocation listener added successfully');
     }
 
     // Search and filter
@@ -650,12 +686,48 @@ class IssueReportingApp {
   }
 
   resetForm() {
-    document.getElementById('issueForm').reset();
-    document.getElementById('imagePreviewContainer').innerHTML = '';
-    document.getElementById('imageName').textContent = '';
+    console.log('🔄 Resetting form...');
+
+    // Reset form and all inputs
+    const issueForm = document.getElementById('issueForm');
+    if (issueForm) {
+      issueForm.reset();
+    }
+
+    // Clear image preview
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    if (imagePreviewContainer) {
+      imagePreviewContainer.innerHTML = '';
+    }
+
+    // Clear image name
+    const imageName = document.getElementById('imageName');
+    if (imageName) {
+      imageName.textContent = '';
+    }
+
+    // Clear image input completely
+    const imageInput = document.getElementById('imageInput');
+    if (imageInput) {
+      imageInput.value = '';
+    }
+
+    // Clear stored image
     this.currentImageFile = null;
-    document.getElementById('latitude').value = '';
-    document.getElementById('longitude').value = '';
+
+    // Clear coordinates
+    const latInput = document.getElementById('latitude');
+    const lngInput = document.getElementById('longitude');
+    if (latInput) latInput.value = '';
+    if (lngInput) lngInput.value = '';
+
+    // Hide detected constituency box
+    const detectedDiv = document.getElementById('detectedConstituency');
+    if (detectedDiv) {
+      detectedDiv.style.display = 'none';
+    }
+
+    console.log('✅ Form reset complete');
   }
 
   showAlert(message, type = 'info') {

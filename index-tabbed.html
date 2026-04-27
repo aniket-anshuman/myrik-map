@@ -85,16 +85,37 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
+            width: 100%;
+            position: relative;
         }
 
         /* Tab Content */
         .tab-content {
-            display: none;
+            display: none !important;
             animation: fadeIn 0.3s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
 
         .tab-content.active {
-            display: block;
+            display: block !important;
+            position: relative;
+        }
+
+        /* Ensure only active tab is visible */
+        #report.tab-content,
+        #map.tab-content,
+        #constituency.tab-content {
+            display: none !important;
+        }
+
+        #report.tab-content.active,
+        #map.tab-content.active,
+        #constituency.tab-content.active {
+            display: block !important;
         }
 
         @keyframes fadeIn {
@@ -391,20 +412,40 @@
         }
 
         #mapLeaflet {
-            height: 100%;
+            height: calc(100vh - 120px);
             width: 100%;
             background: #e5e3df;
             display: block !important;
+            border-radius: 10px;
+        }
+
+        #mapConstituency {
+            height: calc(100vh - 120px);
+            width: 100%;
+            background: #e5e3df;
+            display: block !important;
+            border-radius: 10px;
         }
 
         #map.tab-content {
-            display: block !important;
+            display: none !important;
             height: auto;
             width: 100%;
             padding: 0;
+            overflow: hidden;
         }
 
         #map.tab-content.active {
+            display: block !important;
+        }
+
+        #constituency.tab-content {
+            display: none !important;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #constituency.tab-content.active {
             display: block !important;
         }
 
@@ -540,6 +581,9 @@
         <button class="tab-btn" data-tab="map">
             🗺️ Map View
         </button>
+        <button class="tab-btn" data-tab="constituency">
+            🏛️ Constituencies
+        </button>
     </div>
 
     <!-- Alert Container -->
@@ -589,6 +633,9 @@
                                 id="getCurrentLocation" style="margin-top: 10px;">
                                 📍 Use Current Location
                             </button>
+                            <div id="detectedConstituency" style="margin-top: 12px; padding: 10px; background: #f0f7ff; border-left: 4px solid #667eea; border-radius: 4px; display: none;">
+                                <small style="color: #666;">🏛️ Detected Constituency: <strong id="constituencyName" style="color: #667eea;"></strong></small>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -637,60 +684,16 @@
         <!-- TAB 2: MAP VIEW -->
         <!-- ===================================== -->
         <div id="map" class="tab-content">
-            <div class="map-tab-content">
-                <!-- Map Toolbar -->
-                <div class="map-toolbar">
-                    <div class="toolbar-section">
-                        <span class="toolbar-label">Map Style:</span>
-                        <select id="tileLayerSelect">
-                            <option value="osm">OpenStreetMap</option>
-                            <option value="topo">Topographic</option>
-                            <option value="cartodb">CartoDB</option>
-                            <option value="usgs">USGS</option>
-                        </select>
-                    </div>
+            <!-- Full-screen Map -->
+            <div id="mapLeaflet" style="height: calc(100vh - 120px); width: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1);"></div>
+        </div>
 
-                    <div class="toolbar-section">
-                        <span class="toolbar-label">Filter:</span>
-                        <select id="statusFilter">
-                            <option value="">All Status</option>
-                            <option value="open">Open</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                        </select>
-                    </div>
-
-                    <div class="toolbar-section">
-                        <button id="fitAllBtn">📍 Fit All Markers</button>
-                        <button id="clearSearchBtn">🔄 Clear Filter</button>
-                    </div>
-                </div>
-
-                <!-- Map -->
-                <div class="map-container">
-                    <div id="mapLeaflet" style="height: 600px; width: 100%;"></div>
-                </div>
-
-                <!-- Map Statistics -->
-                <div class="map-stats">
-                    <div class="map-stat-item">
-                        <h4 id="mapTotalCount">0</h4>
-                        <p>Issues on Map</p>
-                    </div>
-                    <div class="map-stat-item">
-                        <h4 id="mapOpenCount">0</h4>
-                        <p>Open Issues</p>
-                    </div>
-                    <div class="map-stat-item">
-                        <h4 id="mapInProgressCount">0</h4>
-                        <p>In Progress</p>
-                    </div>
-                    <div class="map-stat-item">
-                        <h4 id="mapResolvedCount">0</h4>
-                        <p>Resolved</p>
-                    </div>
-                </div>
-            </div>
+        <!-- ===================================== -->
+        <!-- TAB 3: CONSTITUENCY MAP -->
+        <!-- ===================================== -->
+        <div id="constituency" class="tab-content">
+            <!-- Full-screen Map -->
+            <div id="mapConstituency" style="height: calc(100vh - 120px); width: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1);"></div>
         </div>
     </div>
 
@@ -698,8 +701,9 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
-    <!-- Map Manager -->
+    <!-- Map Managers -->
     <script src="map-leaflet.js"></script>
+    <script src="map-constituency.js"></script>
 
     <!-- Application -->
     <script src="app.js"></script>
@@ -711,12 +715,14 @@
 
         // Unified Tab Navigation Handler
         function setupTabNavigation(app) {
+            console.log('🎛️ setupTabNavigation() called');
             appInstance = app;
             document.querySelectorAll('.tab-btn').forEach(btn => {
+                console.log('📑 Adding tab listener to:', btn.dataset.tab);
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
                     const tabName = this.dataset.tab;
-                    console.log('📑 Switching to tab:', tabName);
+                    console.log('📑 Tab clicked:', tabName);
 
                     // Update active tab button
                     document.querySelectorAll('.tab-btn').forEach(b => {
@@ -736,6 +742,10 @@
 
                     // Handle map-specific logic
                     if (tabName === 'map') {
+                        // Hide constituency map if visible
+                        const constMap = document.getElementById('mapConstituency');
+                        if (constMap) constMap.style.display = 'none';
+
                         setTimeout(() => {
                             console.log('🗺️ Map tab activated, initializing map...');
                             if (app && app.initializeMapIfNeeded) {
@@ -748,6 +758,29 @@
                             }
                         }, 100);
                     }
+
+                    // Handle constituency map-specific logic
+                    if (tabName === 'constituency') {
+                        // Hide regular map if visible
+                        const regularMap = document.getElementById('mapLeaflet');
+                        if (regularMap) regularMap.style.display = 'none';
+
+                        setTimeout(() => {
+                            console.log('🏛️ Constituency tab activated, initializing...');
+                            // Show constituency map
+                            const constMap = document.getElementById('mapConstituency');
+                            if (constMap) constMap.style.display = 'block';
+
+                            if (app && app.initializeConstituencyMapIfNeeded) {
+                                app.initializeConstituencyMapIfNeeded();
+                            }
+                            // Invalidate size
+                            if (app && app.constituencyMapManager && app.constituencyMapManager.map) {
+                                app.constituencyMapManager.map.invalidateSize();
+                                console.log('✅ Constituency map size invalidated');
+                            }
+                        }, 100);
+                    }
                 });
             });
         }
@@ -757,16 +790,23 @@
 
         class IssueReportingAppWithMapTab extends OriginalApp {
             constructor() {
+                console.log('👷 IssueReportingAppWithMapTab constructor called');
                 super();
                 this.mapManager = null;
+                this.constituencyMapManager = null;
+                this.isSubmitting = false; // Prevent double submissions
+                this.isProcessingImage = false; // Prevent double image processing
+                this.lastSubmitTime = 0; // Track last submission time
+                this.lastSubmitId = null; // Track last submission to avoid duplicates
             }
 
             init() {
-                console.log('🚀 Initializing app...');
+                console.log('🚀 Extended init() called, listenersSetup =', this.listenersSetup);
                 this.setupEventListeners();
 
-                // Initialize map (but don't load it yet - lazy load)
+                // Initialize maps (but don't load them yet - lazy load)
                 this.mapInitialized = false;
+                this.constituencyMapInitialized = false;
 
                 // Load issues from API on page load
                 console.log('📡 Loading issues from API...');
@@ -776,52 +816,35 @@
             }
 
             setupEventListeners() {
-                // Call parent setup first
+                console.log('🔧 Extended setupEventListeners() called, listenersSetup =', this.listenersSetup);
+                // Check if already setup to prevent duplicate listeners
+                if (this.listenersSetup) {
+                    console.log('⚠️ Extended listeners already setup, skipping');
+                    return;
+                }
+
+                console.log('🔧 Extended class setting up listeners');
+
+                // Call parent setup first (this sets listenersSetup = true)
+                console.log('⬆️ Calling super.setupEventListeners()...');
                 super.setupEventListeners();
+                console.log('✅ Returned from super.setupEventListeners()');
 
                 // Setup unified tab navigation
                 setupTabNavigation(this);
 
-                // Map toolbar
-                if (document.getElementById('tileLayerSelect')) {
-                    document.getElementById('tileLayerSelect').addEventListener('change', (e) => {
-                        if (this.mapManager) {
-                            this.mapManager.switchTileLayer(e.target.value);
-                        }
-                    });
+                // Detect constituency when coordinates change
+                const latInput = document.getElementById('latitude');
+                const lngInput = document.getElementById('longitude');
+                if (latInput && lngInput) {
+                    const detectConstituency = () => this.detectAndDisplayConstituency();
+                    latInput.addEventListener('change', detectConstituency);
+                    lngInput.addEventListener('change', detectConstituency);
+                    latInput.addEventListener('blur', detectConstituency);
+                    lngInput.addEventListener('blur', detectConstituency);
                 }
 
-                if (document.getElementById('statusFilter')) {
-                    document.getElementById('statusFilter').addEventListener('change', (e) => {
-                        if (this.mapManager) {
-                            if (e.target.value) {
-                                const filtered = this.mapManager.filterByStatus(e.target.value);
-                                const ids = Object.keys(filtered);
-                                this.mapManager.highlightMarkers(ids);
-                            } else {
-                                this.mapManager.resetHighlighting();
-                            }
-                        }
-                    });
-                }
 
-                if (document.getElementById('fitAllBtn')) {
-                    document.getElementById('fitAllBtn').addEventListener('click', () => {
-                        if (this.mapManager) {
-                            this.mapManager.fitAllMarkers();
-                        }
-                    });
-                }
-
-                if (document.getElementById('clearSearchBtn')) {
-                    document.getElementById('clearSearchBtn').addEventListener('click', () => {
-                        document.getElementById('statusFilter').value = '';
-                        if (this.mapManager) {
-                            this.mapManager.resetHighlighting();
-                            this.mapManager.clearSearchRadius();
-                        }
-                    });
-                }
             }
 
             async initializeMapIfNeeded() {
@@ -875,7 +898,6 @@
                         }
                     }, 100);
 
-                    this.updateMapStatistics();
                     this.mapInitialized = true;
                     console.log('✅ Map initialized successfully with ' + Object.keys(this.mapManager.markers).length + ' markers');
                 } catch (error) {
@@ -884,26 +906,146 @@
                 }
             }
 
-            async handleFormSubmit(e) {
-                e.preventDefault();
-
-                const formData = new FormData(document.getElementById('issueForm'));
-                const issue = formData.get('issue');
-                const category = formData.get('category');
-                const latitude = parseFloat(formData.get('latitude'));
-                const longitude = parseFloat(formData.get('longitude'));
-
-                if (!this.currentImageFile) {
-                    this.showAlert('Please select an image', 'danger');
-                    return;
-                }
-
-                if (!this.validateCoordinates(latitude, longitude)) {
-                    this.showAlert('Invalid coordinates', 'danger');
+            async initializeConstituencyMapIfNeeded() {
+                if (this.constituencyMapInitialized) {
+                    console.log('✅ Constituency map already initialized, refreshing size...');
+                    if (this.constituencyMapManager && this.constituencyMapManager.map) {
+                        try {
+                            this.constituencyMapManager.map.invalidateSize();
+                            console.log('✅ Constituency map size refreshed');
+                        } catch (e) {
+                            console.warn('⚠️ Map size refresh failed:', e.message);
+                        }
+                    }
                     return;
                 }
 
                 try {
+                    if (typeof L === 'undefined') {
+                        console.error('❌ Leaflet library not loaded');
+                        this.showAlert('Map library failed to load', 'danger');
+                        return;
+                    }
+
+                    const mapContainer = document.getElementById('mapConstituency');
+                    if (!mapContainer) {
+                        console.error('❌ Map container (mapConstituency) not found');
+                        return;
+                    }
+
+                    console.log('🏛️ Initializing constituency map...');
+
+                    if (this.issues.length === 0) {
+                        console.log('📡 Loading issues before constituency map initialization...');
+                        await this.loadIssuesFromAPI();
+                    }
+
+                    // Create new instance only if it doesn't exist
+                    if (!this.constituencyMapManager) {
+                        this.constituencyMapManager = new ConstituencyMapManager('mapConstituency', './india_pc_2019.json');
+                        window.constituencyMapManager = this.constituencyMapManager;
+
+                        await this.constituencyMapManager.loadConstituencies();
+                    }
+
+                    this.constituencyMapManager.updateIssueStats(this.issues);
+
+                    setTimeout(() => {
+                        if (this.constituencyMapManager && this.constituencyMapManager.map) {
+                            try {
+                                this.constituencyMapManager.map.invalidateSize();
+                                this.constituencyMapManager.fitToConstituencies();
+                                console.log('✅ Constituency map size calculated and fitted');
+                            } catch (e) {
+                                console.warn('⚠️ Map sizing error:', e.message);
+                            }
+                        }
+                    }, 200);
+
+                    this.constituencyMapInitialized = true;
+                    console.log('✅ Constituency map ready');
+                } catch (error) {
+                    console.error('❌ Error initializing constituency map:', error);
+                    this.constituencyMapInitialized = false; // Reset flag on error
+                    this.showAlert('Error initializing constituency map: ' + error.message, 'danger');
+                }
+            }
+
+            async handleFormSubmit(e) {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent event bubbling
+
+                // Prevent double submissions - check if submission is in progress
+                if (this.isSubmitting) {
+                    console.log('⏳ Submission already in progress, ignoring duplicate');
+                    return;
+                }
+
+                // Prevent duplicate submissions within 1 second
+                const now = Date.now();
+                if (now - this.lastSubmitTime < 1000) {
+                    console.log('⏳ Duplicate submission detected within 1 second, ignoring');
+                    return;
+                }
+
+                this.lastSubmitTime = now;
+                this.isSubmitting = true;
+
+                // Generate unique submission ID to prevent duplicates
+                const submissionId = `submit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                console.log(`📤 Starting form submission [${submissionId}]...`);
+
+                // Disable submit button while processing
+                const submitBtn = document.querySelector('#issueForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '⏳ Submitting...';
+                }
+
+                try {
+                    const formData = new FormData(document.getElementById('issueForm'));
+                    const issue = formData.get('issue');
+                    const category = formData.get('category');
+                    const latitude = parseFloat(formData.get('latitude'));
+                    const longitude = parseFloat(formData.get('longitude'));
+
+                    if (!this.currentImageFile) {
+                        this.showAlert('Please select an image', 'danger');
+                        this.isSubmitting = false;
+                        return;
+                    }
+
+                    if (!this.validateCoordinates(latitude, longitude)) {
+                        this.showAlert('Invalid coordinates', 'danger');
+                        this.isSubmitting = false;
+                        return;
+                    }
+
+                    // Detect constituency - initialize if needed
+                    let constituency = 'Unknown';
+
+                    // If constituency map not initialized, initialize it now for detection
+                    if (!this.constituencyMapManager) {
+                        console.log('⏳ Initializing constituency manager for detection...');
+                        this.constituencyMapManager = new ConstituencyMapManager('mapConstituency', './india_pc_2019.json');
+                        window.constituencyMapManager = this.constituencyMapManager;
+                        await this.constituencyMapManager.loadConstituencies();
+                    }
+
+                    // Detect constituency from coordinates
+                    if (this.constituencyMapManager && this.constituencyMapManager.constituencies) {
+                        const detected = this.constituencyMapManager.getConstituencyForPoint(latitude, longitude);
+                        if (detected) {
+                            constituency = detected;
+                            console.log(`📍 Auto-detected constituency: ${constituency}`);
+                            this.showAlert(`📍 Detected: ${constituency}`, 'success');
+                        } else {
+                            console.log(`⚠️ Could not detect constituency for ${latitude}, ${longitude}`);
+                            this.showAlert('⚠️ Coordinates outside India', 'warning');
+                        }
+                    }
+
+                    console.log(`📡 Sending API request [${submissionId}]...`);
                     const response = await fetch(`${this.apiBaseUrl}/issues`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -912,8 +1054,10 @@
                             category: category,
                             latitude: latitude,
                             longitude: longitude,
+                            constituency: constituency,
                             imageData: this.currentImageFile,
-                            imageName: this.currentImageFile.name || 'image'
+                            imageName: this.currentImageFile.name || 'image',
+                            _submissionId: submissionId // Unique ID to prevent duplicates
                         })
                     });
 
@@ -926,15 +1070,49 @@
                     // Add to map if already initialized
                     if (this.mapInitialized && this.mapManager) {
                         this.mapManager.addMarker(result.data);
-                        this.updateMapStatistics();
+                    }
+
+                    // Update constituency map if initialized
+                    if (this.constituencyMapInitialized && this.constituencyMapManager) {
+                        this.loadIssuesFromAPI().then(() => {
+                            this.constituencyMapManager.updateIssueStats(this.issues);
+                            this.constituencyMapManager.displayConstituencies();
+                        });
                     }
 
                     this.resetForm();
-                    this.loadIssuesFromAPI();
-                    this.showAlert('Issue reported successfully!', 'success');
+
+                    // Reload issues from API
+                    await this.loadIssuesFromAPI();
+
+                    // Update maps if initialized
+                    if (this.mapInitialized && this.mapManager) {
+                        console.log('🗺️ Updating regular map...');
+                        this.mapManager.addMarker(result.data);
+                    }
+
+                    if (this.constituencyMapInitialized && this.constituencyMapManager) {
+                        console.log('🏛️ Updating constituency map...');
+                        this.constituencyMapManager.updateIssueStats(this.issues);
+                        this.constituencyMapManager.displayConstituencies();
+                    }
+
+                    this.showAlert('✅ Issue reported successfully!', 'success');
+                    console.log(`✅ Form submission completed [${submissionId}]`);
                 } catch (error) {
-                    console.error('Error:', error);
+                    console.error('❌ Error:', error);
                     this.showAlert(`Error: ${error.message}`, 'danger');
+                } finally {
+                    this.isSubmitting = false;
+
+                    // Re-enable submit button
+                    const submitBtn = document.querySelector('#issueForm button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit Issue';
+                    }
+
+                    console.log('🔓 Submission lock released');
                 }
             }
 
@@ -955,7 +1133,6 @@
                     // Remove from map if initialized
                     if (this.mapInitialized && this.mapManager) {
                         this.mapManager.removeMarker(id);
-                        this.updateMapStatistics();
                     }
 
                     this.loadIssuesFromAPI();
@@ -985,7 +1162,6 @@
                     // Update marker on map if initialized
                     if (this.mapInitialized && this.mapManager) {
                         this.mapManager.updateMarker(issue);
-                        this.updateMapStatistics();
                     }
 
                     this.loadIssuesFromAPI();
@@ -1009,6 +1185,179 @@
                     issues.filter(i => i.status === 'in-progress').length;
                 document.getElementById('mapResolvedCount').textContent =
                     issues.filter(i => i.status === 'resolved').length;
+            }
+
+            enrichIssuesWithConstituencies() {
+                if (!this.constituencyMapManager || !this.constituencyMapManager.constituencies) return;
+
+                this.issues.forEach(issue => {
+                    if (!issue.constituency && issue.latitude && issue.longitude) {
+                        const detected = this.constituencyMapManager.getConstituencyForPoint(
+                            issue.latitude,
+                            issue.longitude
+                        );
+                        if (detected) {
+                            issue.constituency = detected;
+                        }
+                    }
+                });
+
+                console.log('✅ Enriched issues with constituency data');
+            }
+
+            handleImageSelect(e) {
+                const files = e.target.files || e.dataTransfer?.files;
+                if (!files || files.length === 0) {
+                    console.log('⚠️ No file selected');
+                    return;
+                }
+
+                const file = files[0];
+
+                // Prevent double image processing
+                if (this.isProcessingImage) {
+                    console.log('⏳ Image already being processed, ignoring duplicate');
+                    return;
+                }
+
+                this.isProcessingImage = true;
+                console.log(`📸 Processing image: ${file.name} (${file.size} bytes)`);
+
+                // Validate file
+                if (!this.validateImageFile(file)) {
+                    this.showAlert('Invalid file. Only images up to 5MB allowed.', 'danger');
+                    this.isProcessingImage = false;
+                    // Clear the input
+                    const imageInput = document.getElementById('imageInput');
+                    if (imageInput) imageInput.value = '';
+                    return;
+                }
+
+                // Read file as base64
+                const reader = new FileReader();
+
+                reader.onload = (event) => {
+                    this.currentImageFile = {
+                        data: event.target.result,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type
+                    };
+                    const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                    console.log(`✅ Image loaded: ${file.name} (${sizeMB}MB)`);
+                    this.showImagePreview(event.target.result, file.name);
+                    this.isProcessingImage = false;
+                    console.log('🔒 Image processing complete');
+                };
+
+                reader.onerror = (error) => {
+                    console.error('❌ Error reading file:', error);
+                    this.showAlert('Error reading image file', 'danger');
+                    this.isProcessingImage = false;
+                    // Clear the input
+                    const imageInput = document.getElementById('imageInput');
+                    if (imageInput) imageInput.value = '';
+                };
+
+                try {
+                    reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('❌ Error starting file read:', error);
+                    this.showAlert('Error reading image file', 'danger');
+                    this.isProcessingImage = false;
+                    // Clear the input
+                    const imageInput = document.getElementById('imageInput');
+                    if (imageInput) imageInput.value = '';
+                }
+            }
+
+            async detectAndDisplayConstituency() {
+                const latInput = document.getElementById('latitude');
+                const lngInput = document.getElementById('longitude');
+                const detectedDiv = document.getElementById('detectedConstituency');
+                const constituencyNameEl = document.getElementById('constituencyName');
+
+                if (!latInput || !lngInput || !detectedDiv || !constituencyNameEl) {
+                    console.warn('⚠️ Constituency detection elements not found');
+                    return;
+                }
+
+                const lat = parseFloat(latInput.value);
+                const lng = parseFloat(lngInput.value);
+
+                if (isNaN(lat) || isNaN(lng)) {
+                    detectedDiv.style.display = 'none';
+                    return;
+                }
+
+                console.log(`🔍 Detecting constituency for ${lat}, ${lng}...`);
+
+                // Initialize constituency manager if needed
+                if (!this.constituencyMapManager) {
+                    try {
+                        console.log('📥 Loading constituencies...');
+                        this.constituencyMapManager = new ConstituencyMapManager('mapConstituency', './india_pc_2019.json');
+                        window.constituencyMapManager = this.constituencyMapManager;
+                        await this.constituencyMapManager.loadConstituencies();
+                        console.log(`✅ Loaded ${Object.keys(this.constituencyMapManager.constituencies).length} constituencies`);
+                    } catch (error) {
+                        console.error('❌ Error loading constituencies:', error);
+                        detectedDiv.style.display = 'none';
+                        return;
+                    }
+                }
+
+                // Detect constituency
+                if (this.constituencyMapManager && this.constituencyMapManager.constituencies) {
+                    const detected = this.constituencyMapManager.getConstituencyForPoint(lat, lng);
+                    if (detected) {
+                        constituencyNameEl.textContent = detected;
+                        detectedDiv.style.display = 'block';
+                        console.log(`✅ Detected: ${detected}`);
+                    } else {
+                        detectedDiv.style.display = 'none';
+                        console.log(`⚠️ No constituency found for ${lat}, ${lng} (outside India?)`);
+                    }
+                } else {
+                    console.error('❌ Constituency manager not properly initialized');
+                    detectedDiv.style.display = 'none';
+                }
+            }
+
+            updateConstituencyStatistics() {
+                if (!this.constituencyMapInitialized || !this.constituencyMapManager) return;
+
+                // Enrich issues with constituency data first
+                this.enrichIssuesWithConstituencies();
+
+                const stats = this.constituencyMapManager.getConstituencyStats();
+                const issuesList = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+                const totalIssues = Object.values(stats).reduce((a, b) => a + b, 0);
+                const constWithIssues = Object.keys(stats).filter(c => stats[c] > 0).length;
+
+                document.getElementById('constTotalIssues').textContent = totalIssues;
+                document.getElementById('constConstituenciesWithIssues').textContent = constWithIssues;
+                document.getElementById('constAveragePerConstituency').textContent =
+                    constWithIssues > 0 ? (totalIssues / constWithIssues).toFixed(0) : '0';
+
+                if (issuesList.length > 0) {
+                    document.getElementById('constHighestConstituency').textContent =
+                        issuesList[0][0].substring(0, 20) + (issuesList[0][0].length > 20 ? '...' : '');
+                }
+
+                // Update top constituencies
+                const topConstDiv = document.getElementById('topConstituencies');
+                topConstDiv.innerHTML = '';
+                issuesList.slice(0, 10).forEach((entry, idx) => {
+                    const [name, count] = entry;
+                    const div = document.createElement('div');
+                    div.className = 'category-item';
+                    div.innerHTML = `
+                        <span class="category-name">${idx + 1}. ${name}</span>
+                        <span class="category-count">${count}</span>
+                    `;
+                    topConstDiv.appendChild(div);
+                });
             }
         }
 

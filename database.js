@@ -10,6 +10,12 @@ class Database {
   constructor(dbPath = './issues.db') {
     this.dbPath = dbPath;
     this.db = null;
+    this.cache = {
+      statistics: null,
+      categoryStats: null,
+      lastCacheTime: 0
+    };
+    this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   }
 
   initialize() {
@@ -29,7 +35,7 @@ class Database {
   createTables() {
     return new Promise((resolve, reject) => {
       this.db.serialize(() => {
-        // Create issues table
+        // Create issues table (IF NOT EXISTS preserves existing data)
         this.db.run(
           `
           CREATE TABLE IF NOT EXISTS issues (
@@ -38,8 +44,10 @@ class Database {
             category TEXT NOT NULL,
             latitude REAL NOT NULL,
             longitude REAL NOT NULL,
+            constituency TEXT,
+            state TEXT,
             status TEXT DEFAULT 'open',
-            imageData TEXT,
+            imageUrl TEXT,
             imageName TEXT,
             createdAt TEXT NOT NULL,
             updatedAt TEXT NOT NULL
@@ -63,9 +71,33 @@ class Database {
           `,
           (err) => {
             if (err) reject(err);
-            else resolve();
           }
         );
+
+        // Create indexes for query optimization
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_status ON issues(status)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_category ON issues(category)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_constituency ON issues(constituency)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_state ON issues(state)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_createdAt ON issues(createdAt DESC)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_issueId_comments ON comments(issueId)');
+
+        // Spatial index support (SQLite doesn't have native spatial index, but we enable R*Tree if available)
+        this.db.run(
+          `CREATE VIRTUAL TABLE IF NOT EXISTS issues_spatial USING rtree(
+            id, minLat, maxLat, minLng, maxLng
+          )`,
+          (err) => {
+            // If R*Tree is not available, continue anyway (not critical)
+            if (err) console.log('R*Tree not available, using standard indexing');
+          }
+        );
+
+        // Enable query optimization settings
+        this.db.run('PRAGMA optimize;', (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
     });
   }
@@ -82,16 +114,19 @@ class Database {
         category,
         latitude,
         longitude,
+        constituency,
+        state,
         status,
         imageData,
+        imageUrl,
         imageName,
         createdAt
       } = issue;
 
       const stmt = this.db.prepare(
         `INSERT INTO issues
-         (id, issue, category, latitude, longitude, status, imageData, imageName, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, issue, category, latitude, longitude, constituency, state, status, imageUrl, imageName, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
 
       stmt.run(
@@ -100,15 +135,20 @@ class Database {
         category,
         latitude,
         longitude,
+        constituency || null,
+        state || null,
         status,
-        imageData,
+        imageUrl || imageData || null,
         imageName,
         createdAt,
         new Date().toISOString(),
         (err) => {
           stmt.finalize();
           if (err) reject(err);
-          else resolve(issue);
+          else {
+            this.invalidateCache();
+            resolve(issue);
+          }
         }
       );
     });
@@ -123,15 +163,25 @@ class Database {
     });
   }
 
-  getAllIssues() {
+  getAllIssues(limit = 100, offset = 0) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT * FROM issues ORDER BY createdAt DESC',
+        'SELECT * FROM issues ORDER BY createdAt DESC LIMIT ? OFFSET ?',
+        [limit, offset],
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows || []);
         }
       );
+    });
+  }
+
+  getTotalIssuesCount() {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT COUNT(*) as count FROM issues', (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.count || 0);
+      });
     });
   }
 
@@ -184,24 +234,37 @@ class Database {
   // Query Operations
   // ============================================================
 
-  getIssuesByStatus(status) {
+  getIssuesByStatus(status, limit = 100, offset = 0) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT * FROM issues WHERE status = ? ORDER BY createdAt DESC',
+        'SELECT * FROM issues WHERE status = ? ORDER BY createdAt DESC LIMIT ? OFFSET ?',
+        [status, limit, offset],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  getIssuesByStatusCount(status) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT COUNT(*) as count FROM issues WHERE status = ?',
         [status],
-        (err, rows) => {
+        (err, row) => {
           if (err) reject(err);
-          else resolve(rows || []);
+          else resolve(row?.count || 0);
         }
       );
     });
   }
 
-  getIssuesByCategory(category) {
+  getIssuesByCategory(category, limit = 100, offset = 0) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT * FROM issues WHERE category = ? ORDER BY createdAt DESC',
-        [category],
+        'SELECT * FROM issues WHERE category = ? ORDER BY createdAt DESC LIMIT ? OFFSET ?',
+        [category, limit, offset],
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows || []);
@@ -210,17 +273,45 @@ class Database {
     });
   }
 
-  searchIssues(searchTerm) {
+  getIssuesByCategoryCount(category) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT COUNT(*) as count FROM issues WHERE category = ?',
+        [category],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row?.count || 0);
+        }
+      );
+    });
+  }
+
+  searchIssues(searchTerm, limit = 100, offset = 0) {
     return new Promise((resolve, reject) => {
       const query = '%' + searchTerm.toLowerCase() + '%';
       this.db.all(
         `SELECT * FROM issues
          WHERE LOWER(issue) LIKE ? OR LOWER(category) LIKE ?
-         ORDER BY createdAt DESC`,
-        [query, query],
+         ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+        [query, query, limit, offset],
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  searchIssuesCount(searchTerm) {
+    return new Promise((resolve, reject) => {
+      const query = '%' + searchTerm.toLowerCase() + '%';
+      this.db.get(
+        `SELECT COUNT(*) as count FROM issues
+         WHERE LOWER(issue) LIKE ? OR LOWER(category) LIKE ?`,
+        [query, query],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row?.count || 0);
         }
       );
     });
@@ -230,8 +321,16 @@ class Database {
   // Statistics
   // ============================================================
 
-  getStatistics() {
+  getStatistics(forceRefresh = false) {
     return new Promise((resolve, reject) => {
+      const now = Date.now();
+
+      // Return cached data if fresh
+      if (!forceRefresh && this.cache.statistics && (now - this.cache.lastCacheTime) < this.CACHE_DURATION) {
+        resolve(this.cache.statistics);
+        return;
+      }
+
       this.db.all(
         `SELECT
            COUNT(*) as total,
@@ -248,6 +347,8 @@ class Database {
               inProgressCount: 0,
               resolvedCount: 0
             };
+            this.cache.statistics = stats;
+            this.cache.lastCacheTime = now;
             resolve(stats);
           }
         }
@@ -255,8 +356,16 @@ class Database {
     });
   }
 
-  getCategoryStats() {
+  getCategoryStats(forceRefresh = false) {
     return new Promise((resolve, reject) => {
+      const now = Date.now();
+
+      // Return cached data if fresh
+      if (!forceRefresh && this.cache.categoryStats && (now - this.cache.lastCacheTime) < this.CACHE_DURATION) {
+        resolve(this.cache.categoryStats);
+        return;
+      }
+
       this.db.all(
         `SELECT category, COUNT(*) as count
          FROM issues
@@ -269,11 +378,21 @@ class Database {
             rows.forEach((row) => {
               stats[row.category] = row.count;
             });
+            this.cache.categoryStats = stats;
+            this.cache.lastCacheTime = now;
             resolve(stats);
           }
         }
       );
     });
+  }
+
+  invalidateCache() {
+    this.cache = {
+      statistics: null,
+      categoryStats: null,
+      lastCacheTime: 0
+    };
   }
 
   // ============================================================

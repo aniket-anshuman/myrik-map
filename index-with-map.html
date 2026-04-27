@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issue Reporting System with Map</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Leaflet Marker Cluster CSS (optional, for clustering) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        /* Map Styles */
+        .map-container {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            height: 700px;
+            width: 100%;
+        }
+
+        .map-toolbar {
+            padding: 15px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .map-toolbar button {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .map-toolbar button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .map-toolbar select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.95em;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 0.95em;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .coords-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .coords-row input {
+            width: 100%;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        /* Image Upload */
+        .image-upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            background: #f8f9ff;
+            transition: all 0.3s;
+        }
+
+        .image-upload-area:hover {
+            background: #f0f2ff;
+        }
+
+        .image-upload-area input {
+            display: none;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 1.8em;
+            margin: 0;
+        }
+
+        .stat-card p {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin: 5px 0 0 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            #map {
+                height: 500px;
+            }
+
+            .coords-row {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-group {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Alert */
+        #alertContainer {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 999;
+            max-width: 300px;
+        }
+
+        .alert {
+            padding: 15px;
+            background: white;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-success {
+            border-left-color: #51cf66;
+            color: #155724;
+        }
+
+        .alert-danger {
+            border-left-color: #ff6b6b;
+            color: #721c24;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .map-popup {
+            font-size: 0.95em;
+        }
+
+        .map-popup h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .map-popup img {
+            max-width: 200px;
+            margin-top: 8px;
+            border-radius: 4px;
+        }
+
+        .map-toolbar-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .map-toolbar-label {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>🗺️ Issue Reporting System with Map</h1>
+        <p>Report and visualize location-based issues</p>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <!-- Form Card -->
+            <div class="card">
+                <h2>Report Issue</h2>
+                <form id="issueForm">
+                    <div class="form-group">
+                        <label for="issueDescription">Description *</label>
+                        <textarea id="issueDescription" name="issue" placeholder="Describe the issue..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category">Category *</label>
+                        <select id="category" name="category" required>
+                            <option value="">Select category</option>
+                            <option value="Road Damage">Road Damage</option>
+                            <option value="Pothole">Pothole</option>
+                            <option value="Street Light">Street Light</option>
+                            <option value="Sidewalk Issue">Sidewalk Issue</option>
+                            <option value="Traffic Sign">Traffic Sign</option>
+                            <option value="Drainage Issue">Drainage Issue</option>
+                            <option value="Vegetation Issue">Vegetation Issue</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Location *</label>
+                        <div class="coords-row">
+                            <input type="number" id="latitude" name="latitude" placeholder="Latitude" step="0.000001" required>
+                            <input type="number" id="longitude" name="longitude" placeholder="Longitude" step="0.000001" required>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="getCurrentLocation" style="margin-top: 8px; width: 100%;">
+                            📍 Use My Location
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Image *</label>
+                        <div class="image-upload-area" id="uploadArea">
+                            <p>📸 Click or drag to upload</p>
+                            <small>JPEG, PNG, GIF, WebP (Max 5MB)</small>
+                            <input type="file" id="imageInput" name="image" accept="image/*" required>
+                        </div>
+                        <div id="imagePreviewContainer"></div>
+                    </div>
+
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary">Submit Issue</button>
+                        <button type="reset" class="btn btn-secondary">Clear</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="card">
+                <h2>Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3 id="totalCount">0</h3>
+                        <p>Total Issues</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <h3 id="openCount">0</h3>
+                        <p>Open Issues</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Map -->
+        <div class="map-container">
+            <div class="map-toolbar">
+                <div class="map-toolbar-section">
+                    <label class="map-toolbar-label">View:</label>
+                    <select id="tileLayerSelect">
+                        <option value="osm">OpenStreetMap</option>
+                        <option value="topo">Topographic</option>
+                        <option value="cartodb">CartoDB</option>
+                        <option value="usgs">USGS</option>
+                    </select>
+                </div>
+
+                <div class="map-toolbar-section">
+                    <label class="map-toolbar-label">Filter:</label>
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="open">Open</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+
+                <button id="fitAllBtn">📍 Fit All</button>
+                <button id="clearSearchBtn">Clear Search</button>
+            </div>
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Marker Cluster (optional) -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <!-- Map Manager -->
+    <script src="map-leaflet.js"></script>
+
+    <!-- Application -->
+    <script src="app.js"></script>
+
+    <!-- Map Integration Script -->
+    <script>
+        // Enhanced version of IssueReportingApp with map integration
+        const OriginalApp = IssueReportingApp;
+
+        class IssueReportingAppWithMap extends OriginalApp {
+            init() {
+                // Initialize map first
+                this.initializeMap();
+
+                // Call parent init
+                super.init();
+
+                // Setup map-specific listeners
+                this.setupMapListeners();
+            }
+
+            initializeMap() {
+                this.mapManager = new LeafletMapManager('map');
+
+                // Add existing issues to map
+                this.issues.forEach(issue => this.mapManager.addMarker(issue));
+            }
+
+            setupMapListeners() {
+                // Tile layer switching
+                document.getElementById('tileLayerSelect').addEventListener('change', (e) => {
+                    this.mapManager.switchTileLayer(e.target.value);
+                });
+
+                // Status filter
+                document.getElementById('statusFilter').addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        const filtered = this.mapManager.filterByStatus(e.target.value);
+                        const ids = Object.keys(filtered);
+                        this.mapManager.highlightMarkers(ids);
+                    } else {
+                        this.mapManager.resetHighlighting();
+                    }
+                });
+
+                // Fit all markers
+                document.getElementById('fitAllBtn').addEventListener('click', () => {
+                    this.mapManager.fitAllMarkers();
+                });
+
+                // Clear search radius
+                document.getElementById('clearSearchBtn').addEventListener('click', () => {
+                    this.mapManager.clearSearchRadius();
+                });
+
+                // Marker selection from map
+                window.addEventListener('markerSelected', (e) => {
+                    console.log('Marker selected:', e.detail);
+                    // You could scroll to and highlight the issue in a list here
+                });
+            }
+
+            async handleFormSubmit(e) {
+                e.preventDefault();
+
+                const formData = new FormData(document.getElementById('issueForm'));
+                const issue = formData.get('issue');
+                const category = formData.get('category');
+                const latitude = parseFloat(formData.get('latitude'));
+                const longitude = parseFloat(formData.get('longitude'));
+
+                if (!this.currentImageFile) {
+                    this.showAlert('Please select an image', 'danger');
+                    return;
+                }
+
+                if (!this.validateCoordinates(latitude, longitude)) {
+                    this.showAlert('Invalid coordinates', 'danger');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/issues`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            issue: issue,
+                            category: category,
+                            latitude: latitude,
+                            longitude: longitude,
+                            imageData: this.currentImageFile,
+                            imageName: this.currentImageFile.name || 'image'
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Error creating issue');
+                    }
+
+                    // Add new issue to map
+                    this.mapManager.addMarker(result.data);
+                    this.mapManager.centerOn(latitude, longitude);
+
+                    this.resetForm();
+                    this.loadIssuesFromAPI();
+                    this.showAlert('Issue reported successfully!', 'success');
+                } catch (error) {
+                    console.error('Error:', error);
+                    this.showAlert(`Error: ${error.message}`, 'danger');
+                }
+            }
+
+            async deleteIssue(id) {
+                if (!confirm('Delete this issue?')) return;
+
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/issues/${id}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Error deleting issue');
+                    }
+
+                    // Remove from map
+                    this.mapManager.removeMarker(id);
+
+                    this.loadIssuesFromAPI();
+                    this.showAlert('Issue deleted successfully', 'success');
+                } catch (error) {
+                    console.error('Error:', error);
+                    this.showAlert(`Error: ${error.message}`, 'danger');
+                }
+            }
+
+            async updateIssueStatus(id, status) {
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/issues/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: status })
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Error updating issue');
+                    }
+
+                    const issue = result.data;
+                    // Update marker on map
+                    this.mapManager.updateMarker(issue);
+
+                    this.loadIssuesFromAPI();
+                    this.showAlert(`Issue marked as ${status}`, 'success');
+                } catch (error) {
+                    console.error('Error:', error);
+                    this.showAlert(`Error: ${error.message}`, 'danger');
+                }
+            }
+        }
+
+        // Replace the original app
+        window.IssueReportingApp = IssueReportingAppWithMap;
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new IssueReportingAppWithMap();
+        });
+    </script>
+</body>
+</html>

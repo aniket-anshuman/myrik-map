@@ -1,0 +1,35 @@
+{
+  "name": "issue-reporting-api",
+  "version": "1.0.0",
+  "description": "REST API for location-based issue reporting system with image upload",
+  "main": "app.js",
+  "scripts": {
+    "start": "node start.js",
+    "server": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node seed.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "issue",
+    "reporting",
+    "rest-api",
+    "geolocation",
+    "file-upload"
+  ],
+  "author": "Your Name",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "sqlite3": "^5.1.6",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5",
+    "open": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20",
+    "jest": "^29.0.0",
+    "supertest": "^6.3.3"
+  }
+}

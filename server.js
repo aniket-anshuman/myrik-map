@@ -11,7 +11,9 @@ const Database = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const db = new Database('./issues.db');
+
+const dbPath = process.env.VERCEL ? '/tmp/issues.db' : './issues.db';
+const db = new Database(dbPath);
 
 // ============================================================
 // Middleware
@@ -20,7 +22,15 @@ const db = new Database('./issues.db');
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.static('.')); // Serve static files from current directory
+
+// Serve static files (HTML, CSS, JS, images, GeoJSON)
+app.use(express.static('.', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+  }
+}));
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -393,11 +403,35 @@ app.use((err, req, res, next) => {
 // Server Initialization
 // ============================================================
 
+// Initialize database once on startup
+let dbInitialized = false;
+let dbInitPromise = db.initialize().then(() => {
+  dbInitialized = true;
+  console.log('Database initialized');
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+});
+
+// Middleware to ensure DB is initialized before handling requests
+app.use(async (req, res, next) => {
+  if (!dbInitialized) {
+    try {
+      await dbInitPromise;
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database initialization failed',
+        error: err.message
+      });
+    }
+  }
+  next();
+});
+
+// Start function for local development
 async function start() {
   try {
-    await db.initialize();
-    console.log('Database initialized');
-
+    await dbInitPromise;
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
@@ -414,4 +448,10 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-start();
+// Only start server in local environment (not on Vercel)
+if (require.main === module && !process.env.VERCEL) {
+  start();
+}
+
+// Export app for Vercel serverless functions
+module.exports = app;

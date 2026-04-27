@@ -25,9 +25,16 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files (HTML, CSS, JS, images, GeoJSON)
 app.use(express.static('.', {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.json')) {
-      res.setHeader('Content-Type', 'application/json');
+  setHeaders: (res, filePath) => {
+    // Set correct MIME types
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    } else if (filePath.endsWith('.html')) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
     }
   }
 }));

@@ -23,20 +23,18 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Explicit routes for static assets with correct MIME types (before general static middleware)
-app.get('*.js', (req, res, next) => {
-  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  express.static('.')(req, res, next);
-});
-
-app.get('*.json', (req, res, next) => {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  express.static('.')(req, res, next);
-});
-
-app.get('*.css', (req, res, next) => {
-  res.setHeader('Content-Type', 'text/css; charset=utf-8');
-  express.static('.')(req, res, next);
+// Middleware to set correct MIME types before serving static files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.js')) {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  } else if (req.path.endsWith('.json')) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  } else if (req.path.endsWith('.css')) {
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+  } else if (req.path.endsWith('.html')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  }
+  next();
 });
 
 // Serve static files (HTML, CSS, JS, images, GeoJSON)

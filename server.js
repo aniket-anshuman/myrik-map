@@ -37,8 +37,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files (HTML, CSS, JS, images, GeoJSON)
-app.use(express.static('.'));
+// Serve static files (HTML, CSS, JS, images, GeoJSON) - use __dirname for serverless
+app.use(express.static(__dirname));
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();

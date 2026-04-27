@@ -317,6 +317,22 @@ class Database {
     });
   }
 
+  getIssuesByBoundingBox(minLat, maxLat, minLng, maxLng, limit = 500, offset = 0) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT * FROM issues
+         WHERE latitude >= ? AND latitude <= ?
+         AND longitude >= ? AND longitude <= ?
+         ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+        [minLat, maxLat, minLng, maxLng, limit, offset],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
   // ============================================================
   // Statistics
   // ============================================================

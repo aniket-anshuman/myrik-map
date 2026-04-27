@@ -54,14 +54,28 @@ app.get('/api/health', (req, res) => {
 // Issue Endpoints
 // ============================================================
 
-// GET all issues
+// GET all issues (with optional bounding box filtering)
 app.get('/api/issues', async (req, res) => {
   try {
     const status = req.query.status;
     const category = req.query.category;
+    const minLat = req.query.minLat;
+    const maxLat = req.query.maxLat;
+    const minLng = req.query.minLng;
+    const maxLng = req.query.maxLng;
 
     let issues;
-    if (status) {
+
+    // If bounding box parameters are provided, use them for efficient spatial filtering
+    if (minLat !== undefined && maxLat !== undefined && minLng !== undefined && maxLng !== undefined) {
+      const min = parseFloat(minLat);
+      const max = parseFloat(maxLat);
+      const minL = parseFloat(minLng);
+      const maxL = parseFloat(maxLng);
+
+      console.log(`🗺️ Fetching issues in bounding box: lat[${min}, ${max}], lng[${minL}, ${maxL}]`);
+      issues = await db.getIssuesByBoundingBox(min, max, minL, maxL);
+    } else if (status) {
       issues = await db.getIssuesByStatus(status);
     } else if (category) {
       issues = await db.getIssuesByCategory(category);

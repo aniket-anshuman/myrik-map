@@ -717,6 +717,10 @@
         function setupTabNavigation(app) {
             console.log('🎛️ setupTabNavigation() called');
             appInstance = app;
+            if (app.attachedListeners && app.attachedListeners.has('tabNavigation-extended')) {
+                console.log('⚠️ Tab navigation already setup, skipping');
+                return;
+            }
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 console.log('📑 Adding tab listener to:', btn.dataset.tab);
                 btn.addEventListener('click', function(e) {
@@ -783,6 +787,10 @@
                     }
                 });
             });
+            // Mark tab navigation as setup
+            if (app.attachedListeners) {
+                app.attachedListeners.add('tabNavigation-extended');
+            }
         }
 
         // Extend IssueReportingApp with map functionality
@@ -897,6 +905,9 @@
                             console.log('✅ Map size calculated');
                         }
                     }, 100);
+
+                    // Add bounding box filtering on map move/zoom
+                    this.setupMapBoundingBoxListeners();
 
                     this.mapInitialized = true;
                     console.log('✅ Map initialized successfully with ' + Object.keys(this.mapManager.markers).length + ' markers');
@@ -1358,6 +1369,52 @@
                     `;
                     topConstDiv.appendChild(div);
                 });
+            }
+
+            setupMapBoundingBoxListeners() {
+                if (!this.mapManager || !this.mapManager.map) {
+                    console.log('⚠️ Map not initialized, cannot setup bbox listeners');
+                    return;
+                }
+
+                const map = this.mapManager.map;
+                let boundsChangeTimeout;
+
+                // Debounce to avoid too many API calls while dragging/zooming
+                const onMapMove = async () => {
+                    clearTimeout(boundsChangeTimeout);
+                    boundsChangeTimeout = setTimeout(async () => {
+                        try {
+                            // Get current bounds and expand them slightly to pre-fetch nearby issues
+                            const bounds = this.mapManager.getCurrentBounds();
+                            const expandedBounds = this.mapManager.expandBounds(bounds, 20);
+
+                            console.log(`📦 Map moved - fetching issues in expanded bbox`);
+
+                            // Fetch issues using bounding box
+                            await this.loadIssuesFromAPI(expandedBounds);
+
+                            // Clear and re-add markers
+                            if (this.mapManager.markerClusterGroup) {
+                                this.mapManager.markerClusterGroup.clearLayers();
+                            }
+
+                            this.issues.forEach(issue => {
+                                this.mapManager.addMarker(issue);
+                            });
+
+                            console.log(`✅ Updated map with ${this.issues.length} issues in view`);
+                        } catch (error) {
+                            console.error('❌ Error updating map issues:', error);
+                        }
+                    }, 500); // Debounce for 500ms
+                };
+
+                // Listen to map move and zoom events
+                map.on('move', onMapMove);
+                map.on('zoom', onMapMove);
+
+                console.log('✅ Bounding box listeners setup complete');
             }
         }
 

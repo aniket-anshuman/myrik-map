@@ -522,6 +522,44 @@ class LeafletMapManager {
       this.map
     );
   }
+
+  // ============================================================
+  // Bounding Box Methods
+  // ============================================================
+
+  /**
+   * Get the current map bounding box
+   * @returns {Object} - Object with minLat, maxLat, minLng, maxLng
+   */
+  getCurrentBounds() {
+    const bounds = this.map.getBounds();
+    return {
+      minLat: bounds.getSouth(),
+      maxLat: bounds.getNorth(),
+      minLng: bounds.getWest(),
+      maxLng: bounds.getEast()
+    };
+  }
+
+  /**
+   * Expand bounding box by a percentage to pre-fetch nearby issues
+   * @param {Object} bounds - Bounding box object
+   * @param {number} expandPercent - Percentage to expand (default: 20%)
+   * @returns {Object} - Expanded bounding box
+   */
+  expandBounds(bounds, expandPercent = 20) {
+    const latRange = bounds.maxLat - bounds.minLat;
+    const lngRange = bounds.maxLng - bounds.minLng;
+    const latExpand = (latRange * expandPercent) / 100;
+    const lngExpand = (lngRange * expandPercent) / 100;
+
+    return {
+      minLat: bounds.minLat - latExpand,
+      maxLat: bounds.maxLat + latExpand,
+      minLng: bounds.minLng - lngExpand,
+      maxLng: bounds.maxLng + lngExpand
+    };
+  }
 }
 
 // ============================================================

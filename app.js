@@ -10,6 +10,7 @@ class IssueReportingApp {
     this.currentImageFile = null;
     this.apiBaseUrl = 'http://localhost:3000/api';
     this.listenersSetup = false; // Prevent duplicate listeners
+    this.attachedListeners = new Set(); // Track which elements have listeners
     this.categories = [
       'Road Damage',
       'Pothole',
@@ -48,18 +49,19 @@ class IssueReportingApp {
 
     // Form submission - only add listener once
     const issueForm = document.getElementById('issueForm');
-    if (issueForm) {
+    if (issueForm && !this.attachedListeners.has('issueForm')) {
       issueForm.addEventListener('submit', (e) => {
         console.log('📝 Form submit event triggered');
         this.handleFormSubmit(e);
       });
+      this.attachedListeners.add('issueForm');
     }
 
     // Image upload
     const uploadArea = document.getElementById('uploadArea');
     const imageInput = document.getElementById('imageInput');
 
-    if (uploadArea && imageInput) {
+    if (uploadArea && imageInput && !this.attachedListeners.has('uploadArea')) {
       // Click handler - open file picker
       uploadArea.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -72,10 +74,8 @@ class IssueReportingApp {
         console.log('📂 File selected, processing');
         this.handleImageSelect(e);
       });
-    }
 
-    // Drag and drop
-    if (uploadArea && imageInput) {
+      // Drag and drop
       uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -98,11 +98,13 @@ class IssueReportingApp {
           this.handleImageSelect({ target: { files: e.dataTransfer.files } });
         }
       });
+
+      this.attachedListeners.add('uploadArea');
     }
 
-    // Geolocation - only add listener once
+    // Geolocation - only add listener once (check attachedListeners set)
     const getCurrentLocationBtn = document.getElementById('getCurrentLocation');
-    if (getCurrentLocationBtn) {
+    if (getCurrentLocationBtn && !this.attachedListeners.has('getCurrentLocation')) {
       console.log('📍 Adding listener to getCurrentLocation button');
       getCurrentLocationBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -110,43 +112,53 @@ class IssueReportingApp {
         console.log('🎯 Get current location CLICKED');
         this.getCurrentLocation();
       });
+      this.attachedListeners.add('getCurrentLocation');
       console.log('✅ Geolocation listener added successfully');
+    } else if (this.attachedListeners.has('getCurrentLocation')) {
+      console.log('⚠️ getCurrentLocation listener already attached, skipping');
     }
 
     // Search and filter
     const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
+    if (searchInput && !this.attachedListeners.has('searchInput')) {
       searchInput.addEventListener('input', (e) =>
         this.filterIssues(e.target.value)
       );
+      this.attachedListeners.add('searchInput');
     }
 
     const categoryFilter = document.getElementById('categoryFilter');
-    if (categoryFilter) {
+    if (categoryFilter && !this.attachedListeners.has('categoryFilter')) {
       categoryFilter.addEventListener('change', (e) =>
         this.filterByCategory(e.target.value)
       );
+      this.attachedListeners.add('categoryFilter');
     }
 
-    // Tabs
-    document.querySelectorAll('.tab-btn').forEach((btn) => {
-      btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
-    });
+    // Tabs - only add listeners once (extended class uses setupTabNavigation instead)
+    if (!this.attachedListeners.has('tab-buttons')) {
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+      });
+      this.attachedListeners.add('tab-buttons');
+    }
 
     // Modal
     const closeModal = document.getElementById('closeModal');
     const imageModal = document.getElementById('imageModal');
-    if (closeModal) {
+    if (closeModal && !this.attachedListeners.has('closeModal')) {
       closeModal.addEventListener('click', () =>
         this.closeImageModal()
       );
+      this.attachedListeners.add('closeModal');
     }
-    if (imageModal) {
+    if (imageModal && !this.attachedListeners.has('imageModal')) {
       imageModal.addEventListener('click', (e) => {
         if (e.target.id === 'imageModal') {
           this.closeImageModal();
         }
       });
+      this.attachedListeners.add('imageModal');
     }
   }
 
@@ -645,18 +657,31 @@ class IssueReportingApp {
   // API Data Fetching
   // ============================================================
 
-  async loadIssuesFromAPI() {
+  async loadIssuesFromAPI(boundingBox = null) {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/issues`);
+      let url = `${this.apiBaseUrl}/issues`;
+
+      // If bounding box is provided, add it as query parameters for faster filtering
+      if (boundingBox && boundingBox.minLat !== undefined) {
+        const params = new URLSearchParams({
+          minLat: boundingBox.minLat,
+          maxLat: boundingBox.maxLat,
+          minLng: boundingBox.minLng,
+          maxLng: boundingBox.maxLng
+        });
+        url += `?${params.toString()}`;
+        console.log(`📦 Fetching issues with bounding box: ${url}`);
+      }
+
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error('Error fetching issues');
       }
 
       const result = await response.json();
-      console.log('API response:', result);
+      console.log(`📥 Loaded ${result.data.length} issues from API`);
       this.issues = result.data || [];
-      console.log('Loaded issues from API:', this.issues);
       this.renderIssues();
       this.updateStatistics();
     } catch (error) {

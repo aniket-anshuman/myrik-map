@@ -2,6 +2,8 @@
 // Express Server for Issue Reporting System
 // ============================================================
 
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -11,8 +13,9 @@ const Database = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}/api`;
 
-const dbPath = process.env.VERCEL ? '/tmp/issues.db' : './issues.db';
+const dbPath = process.env.VERCEL ? '/tmp/issues.db' : (process.env.DB_PATH || './issues.db');
 const db = new Database(dbPath);
 
 // ============================================================
@@ -73,11 +76,20 @@ app.get('/index.html', (req, res) => {
 });
 
 // ============================================================
-// Health Check
+// Health Check & Config
 // ============================================================
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
+});
+
+// Config endpoint - returns API configuration
+app.get('/api/config', (req, res) => {
+  res.json({
+    apiBaseUrl: API_BASE_URL,
+    port: PORT,
+    env: process.env.NODE_ENV || 'development'
+  });
 });
 
 // ============================================================

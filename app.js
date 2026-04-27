@@ -8,7 +8,7 @@ class IssueReportingApp {
     this.issues = [];
     this.filteredIssues = [];
     this.currentImageFile = null;
-    this.apiBaseUrl = 'http://localhost:3000/api';
+    this.apiBaseUrl = 'http://localhost:3000/api'; // Default, will be overridden
     this.listenersSetup = false; // Prevent duplicate listeners
     this.attachedListeners = new Set(); // Track which elements have listeners
     this.categories = [
@@ -22,6 +22,20 @@ class IssueReportingApp {
       'Other'
     ];
 
+    this.initConfig();
+  }
+
+  async initConfig() {
+    try {
+      const response = await fetch('/api/config');
+      if (response.ok) {
+        const config = await response.json();
+        this.apiBaseUrl = config.apiBaseUrl;
+        console.log('✅ API Base URL loaded from config:', this.apiBaseUrl);
+      }
+    } catch (error) {
+      console.log('⚠️ Could not load config, using default API URL:', this.apiBaseUrl);
+    }
     this.init();
   }
 

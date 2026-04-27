@@ -53,6 +53,18 @@ const upload = multer({
 });
 
 // ============================================================
+// Root Route - Serve HTML
+// ============================================================
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index-tabbed.html'));
+});
+
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index-tabbed.html'));
+});
+
+// ============================================================
 // Health Check
 // ============================================================
 

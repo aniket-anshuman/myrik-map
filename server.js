@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}/api`;
 
-const dbPath = process.env.VERCEL ? '/tmp/issues.db' : (process.env.DB_PATH || './issues.db');
+const dbPath = './issues.db';
 const db = new Database(dbPath);
 
 // ============================================================
